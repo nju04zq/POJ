@@ -1,0 +1,390 @@
+#!/usr/bin/env python
+
+import os
+import time
+import yaml
+import shutil
+import random
+import hashlib
+import datetime
+import optparse
+import traceback
+from util.util import POJError
+
+_QUESTION_DIR_ = "questions"
+_QUESTION_SCRIPT_ = "script.py"
+_BUILD_DIR_ = "build"
+_ANSWER_SCRIPT_ = "answer.py"
+_LOG_DIR_ = "log"
+_QUESTION_LOG_FILE_ = "submit.log"
+_SESSION_CONF_ = "session.yaml"
+_STATS_FILE_ = "stats.yaml"
+
+_DEBUG_MODE_ = False
+
+class Colors(object):
+    ALL_OFF = "\033[0m"
+    FG_RED = "\033[31m"
+    FG_GREEN = "\033[32m"
+
+def format_err_msg(msg):
+    s = Colors.FG_RED + msg + Colors.ALL_OFF
+    return s
+
+def format_red(s):
+    s = Colors.FG_RED + s + Colors.ALL_OFF
+    return s
+
+def format_green(s):
+    s = Colors.FG_GREEN + s + Colors.ALL_OFF
+    return s
+
+class POJError(Exception):
+    def __init__(self, value):
+        self.value = value
+
+    def __str__(self):
+        return format_err_msg(self.value)
+
+class Session(object):
+    KEY_QUESTION_NAME = "question_name"
+    KEY_SESSION_ID = "session_id"
+    KEY_SUBMIT_CNT = "submit_cnt"
+
+    def __init__(self, question_name=None, from_yaml=False):
+        if question_name is None:
+            question_name = questions.choose_one_question()
+        else:
+            questions.validate_question(question_name)
+        if from_yaml:
+            self.init_from_yaml()
+        else:
+            self.question_name = question_name
+            self.session_id = self.create_session_id()
+            self.submit_cnt = 0
+        self.submit_ts = None
+
+    def init_from_yaml(self):
+        if not os.path.exists(_SESSION_CONF_):
+            raise POJError("Please run poj new first!")
+
+        with open(_SESSION_CONF_, "r") as fp:
+            data = yaml.load(fp)
+        self.question_name = data[self.KEY_QUESTION_NAME]
+        self.session_id = data[self.KEY_SESSION_ID]
+        self.submit_cnt = data[self.KEY_SUBMIT_CNT]
+
+    def create_session_id(self):
+        m = hashlib.md5()
+        m.update(str(time.time()))
+        return m.hexdigest()
+
+    def save(self):
+        conf = {}
+        conf[self.KEY_QUESTION_NAME] = self.question_name
+        conf[self.KEY_SESSION_ID] = self.session_id
+        conf[self.KEY_SUBMIT_CNT] = self.submit_cnt
+        with open(_SESSION_CONF_, "w") as fp:
+            fp.write(yaml.dump(conf, default_flow_style=False))
+
+    def clean_build(self):
+        if os.path.exists(_BUILD_DIR_):
+            shutil.rmtree(_BUILD_DIR_)
+        if os.path.lexists(_ANSWER_SCRIPT_):
+            os.remove(_ANSWER_SCRIPT_)
+
+    def get_answer_path(self):
+        return _BUILD_DIR_ + os.sep + _ANSWER_SCRIPT_
+
+    def create_empty_file(self, fpath):
+        open(fpath, "w").close()
+
+    def setup_build(self):
+        os.mkdir(_BUILD_DIR_)
+        self.create_empty_file(_BUILD_DIR_ + os.sep + "__init__.py")
+        self.create_empty_file(self.get_answer_path())
+        os.symlink(self.get_answer_path(), _ANSWER_SCRIPT_)
+
+    def start(self):
+        self.clean_build()
+        self.setup_build()
+
+    def show_question(self):
+        questions.print_question_desc(self.question_name)
+        print "Please save your answer in {0}.".format(_ANSWER_SCRIPT_)
+
+    def clean(self):
+        self.clean_build()
+
+    def submit(self):
+        self.submit_cnt += 1
+        self.submit_ts = datetime.datetime.now()
+        self.copy_question_script()
+        result = self.build_answer()
+        self.log_build_result(result)
+        self.show_submit_result(result)
+        self.save()
+
+    def copy_question_script(self):
+        script_path = questions.get_question_script_path(self.question_name)
+        dst_path = _BUILD_DIR_ + os.sep + _QUESTION_SCRIPT_
+        with open(dst_path, "w") as fp:
+            answer_module = os.path.splitext(_ANSWER_SCRIPT_)[0]
+            fp.write("import {0}\n".format(answer_module))
+            fp.write("import sys\n")
+            fp.write('sys.path.append("..")\n')
+            with open(script_path, "r") as fp1:
+                lines = fp1.readlines()
+            fp.writelines(lines)
+
+    def build_answer(self):
+        from build.script import run_test
+        try:
+            result = run_test()
+        except:
+            s = traceback.format_exc()
+            raise POJError("Run failed, {0}".format(s))
+        return result
+
+    def get_question_log_dir_path(self):
+        return _LOG_DIR_ + os.sep + self.question_name
+
+    def get_answer_file_save_name(self):
+        answer_fname = self.session_id + "-" + str(self.submit_cnt)
+        return answer_fname
+
+    def save_submit_log(self, result):
+        rc, passed, total, fail_case_str = result
+        question_log_dir = self.get_question_log_dir_path()
+        if not os.path.exists(question_log_dir):
+            os.makedirs(question_log_dir)
+        question_log_fpath = question_log_dir + os.sep + _QUESTION_LOG_FILE_
+        ts = self.submit_ts.strftime("%Y-%m-%d %H:%M:%S:")
+        if rc == True:
+            rc = "PASS"
+        else:
+            rc = "FAIL"
+        answer_fname = self.get_answer_file_save_name()
+        with open(question_log_fpath, "a") as fp:
+            fp.write("{0} Submit result {1}, {2}/{3}, answer {4}\n".\
+                     format(ts, rc, passed, total, answer_fname))
+            if fail_case_str != "":
+                fp.write(fail_case_str + "\n")
+
+    def save_submit_answer(self):
+        answer_fname = self.get_answer_file_save_name()
+        dst_path = self.get_question_log_dir_path() + os.sep + answer_fname
+        shutil.copyfile(self.get_answer_path(), dst_path)
+
+    def save_question_stats(self):
+        question_stats.inc_question(self.question_name)
+
+    def log_build_result(self, result):
+        rc, passed, total, fail_case_str = result
+        self.save_submit_log(result)
+        self.save_submit_answer()
+        if rc == True:
+            self.save_question_stats()
+
+    def show_submit_result(self, result):
+        rc, passed, total, fail_case_str = result
+        if rc == True:
+            rc = format_green("PASS")
+        else:
+            rc = format_red("FAIL")
+        print "Submit {0}, passed test cases {1}/{2}".format(rc, passed, total)
+        if fail_case_str != "":
+            print fail_case_str
+
+class QuestionStats(object):
+    KEY_CNT = "pass_count"
+    KEY_TS  = "pass_time"
+
+    STATS_PATH = _LOG_DIR_ + os.sep + _STATS_FILE_
+
+    def __init__(self):
+        if os.path.exists(self.STATS_PATH):
+            self.stats = self.init_from_yaml()
+        else:
+            self.stats = {}
+
+    def init_from_yaml(self):
+        stats = self.load_from_yaml()
+        self.remove_inactive_questions(stats)
+        return stats
+
+    def load_from_yaml(self):
+        with open(self.STATS_PATH, "r") as fp:
+            stats = yaml.load(fp)
+        return stats
+
+    def remove_inactive_questions(self, stats):
+        for name in stats.keys():
+            if name not in questions.name_list:
+                stats.pop(name)
+
+    def get_least_submit_question(self):
+        name_list = []
+        question_names = self.stats.keys()
+        if len(question_names) == 0:
+            return name_list
+        min_cnt = min(self.stats[name][self.KEY_CNT] for name in question_names)
+        for name in question_names:
+            if self.stats[name][self.KEY_CNT] == min_cnt:
+                name_list.append(name)
+        return name_list
+
+    def inc_question(self, question_name):
+        ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        if question_name in self.stats:
+            self.stats[question_name][self.KEY_CNT] += 1
+            self.stats[question_name][self.KEY_TS].append(ts)
+        else:
+            self.stats[question_name] = {self.KEY_CNT: 1}
+            self.stats[question_name][self.KEY_TS] = [ts]
+        self.update()
+
+    def update(self):
+        with open(self.STATS_PATH, "w") as fp:
+           fp.write(yaml.dump(self.stats, default_flow_style=False))
+
+    def clean(self, question_name):
+        self.stats = self.load_from_yaml()
+        if question_name in self.stats:
+            self.stats.pop(question_name)
+            self.update()
+
+class Questions(object):
+    def __init__(self):
+        self.name_list = self.get_question_name_list()
+        self.cur_question_name = None
+
+    def get_question_name_list(self):
+        entry_list = os.listdir(_QUESTION_DIR_)
+        name_list = []
+        for entry in entry_list:
+            entry_path = _QUESTION_DIR_ + os.sep + entry
+            if not os.path.isdir(entry_path):
+                continue
+            if (not _DEBUG_MODE_ and entry == "test"):
+                continue
+            if entry.startswith("#"):
+                continue
+            name_list.append(entry)
+        return name_list
+
+    def filter_question_name_list(self):
+        name_list = question_stats.get_least_submit_question()
+        name_list += self.get_untouched_question()
+        return name_list
+
+    def get_untouched_question(self):
+        name_list = []
+        for name in self.name_list:
+            if name not in question_stats.stats:
+                name_list.append(name)
+        return name_list
+
+    def get_question_path(self, question_name):
+        return _QUESTION_DIR_ + os.sep + question_name
+
+    def get_question_script_path(self, question_name):
+        path = self.get_question_path(question_name)
+        return path + os.sep + _QUESTION_SCRIPT_
+    
+    def validate_question(self, question_name):
+        question_path = self.get_question_path(question_name)
+        if not os.path.isdir(question_path):
+            raise POJError("Question {0} not found!".format(question_name))
+        script_path = self.get_question_script_path(question_name)
+        if not os.path.isfile(script_path):
+            raise POJError("For question {0}, script {1} not found!".format(\
+                           question_name, script_path))
+        question_desc = self.read_question_desc(question_name)
+        if question_desc == "":
+            raise POJError("For question {0}, description not found!".format(\
+                           question_name))
+
+    def choose_one_question(self):
+        if len(self.name_list) == 0:
+            raise POJError("Please create a question first!")
+
+        name_list = self.filter_question_name_list()
+        random.seed()
+        self.cur_question_name = random.choice(name_list)
+        self.validate_question(self.cur_question_name)
+        return self.cur_question_name
+
+    def read_question_desc(self, question_name):
+        script_path = self.get_question_script_path(question_name)
+        desc = []
+        with open(script_path, "r") as fp:
+            for line in fp.readlines():
+                if line.startswith("#"):
+                    desc.append(line)
+                else:
+                    break
+        return "".join(desc)
+
+    def print_question_desc(self, question_name):
+        print "Question: " + question_name
+        print self.read_question_desc(question_name)
+
+def poj_new(question_name):
+    session = Session(question_name=question_name)
+    session.start()
+    session.save()
+    session.show_question()
+
+def poj_submit():
+    session = Session(from_yaml=True)
+    session.submit()
+
+def clean_log_dir(question_name):
+    path = _LOG_DIR_ + os.sep + question_name
+    if os.path.exists(path):
+        shutil.rmtree(path)
+
+def poj_clean(question_name):
+    if question_name is None:
+        raise POJError("Please run with question name!")
+    question_stats.clean(question_name)
+    clean_log_dir(question_name)
+
+def init_question():
+    global questions
+    global question_stats
+    questions = Questions()
+    question_stats = QuestionStats()
+
+def set_debug_mode(debug_mode):
+    global _DEBUG_MODE_
+    _DEBUG_MODE_ = debug_mode
+
+def main():
+    parser = optparse.OptionParser()
+    parser.add_option("-d", "--debug",
+                      action="store_true", dest="debug", default=False,
+                      help="Run POJ in debug mode")
+    parser.add_option("-n", "--name", dest="name", metavar="NAME",
+                      help="Run POJ with specific question name")
+    options, args = parser.parse_args()
+    set_debug_mode(options.debug)
+    init_question()
+    if len(args) == 0:
+        print "Please run with new/submit!"
+    elif args[0] == "new":
+        poj_new(options.name)
+    elif args[0] == "submit":
+        poj_submit()
+    elif args[0] == "clean":
+        poj_clean(options.name)
+    else:
+        print "Unsupported arg {0}".format(args[0])
+
+questions = None
+question_stats = None
+
+if __name__ == "__main__":
+    main()
+
