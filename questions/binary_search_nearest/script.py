@@ -23,26 +23,34 @@ else:
     def binary_search_nearest(target, array):
         return answer.binary_search_nearest(target, array)
 
-def run_one_test_case():
-    a = util.randint_list()
-    t = util.randint()
+def run_one_test_case(t, a):
     i = binary_search_nearest(t, a)
     j = brutal_search(t, a)
     if i < 0 and i == j:
         return True, ""
     if i < 0 or i >= len(a):
-        test_case = "Find nearest {0} in {1}, get {2}, out of range".\
-                    format(t, a, i)
-        return False, test_case
+        err = "Find nearest {0} in {1}, get {2}, out of range".\
+              format(t, a, i)
+        return False, err
     elif a[i] != a[j]:
-        test_case = "Find nearest {0} in {1}, get {2}/{3}, should be {4}/{5}".\
-                    format(t, a, i, a[i], j, a[j])
-        return False, test_case
+        err  = "Find nearest {0} in {1}, get {2}/{3}, should be {4}/{5}".\
+               format(t, a, i, a[i], j, a[j])
+        return False, err
     else:
         return True, ""
 
+def generate_test_data_list():
+    test_data_list = []
+    for i in xrange(10000):
+        t = util.randint()
+        a = util.randint_sorted_array()
+        test_data_list.append((t, a))
+    return test_data_list
+
 def run_test():
-    rc, passed, total, err = util.run_test_in_parallel(run_one_test_case, 10000)
+    test_data_list = generate_test_data_list()
+    result = util.run_test_in_parallel(run_one_test_case, test_data_list)
+    rc, passed, total, err = result
     return rc, passed, total, err
 
 if __name__ == "__main__":

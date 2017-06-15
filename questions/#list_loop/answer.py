@@ -1,7 +1,3 @@
-import sys
-sys.path.append("../")
-import util.util as util
-
 def get_list_loop_entry_node(a):
     p1 = p2 = a
     # should choose p2_prev, instead of p1_prev

@@ -1,34 +1,39 @@
-# Add two integers, return the sum
+# Give an array filled with integers, sort it in non-decending order,
+# using selection sort
 # Define the API interface as:
-# def add(a, b):
+# def selection_sort(a):
 
 import sys
 sys.path.append("../../")
 import util.util as util
 
-if __name__ == "__main__":
-    def add(a, b):
-        return a + b
-else:
-    def add(a, b):
-        return answer.add(a, b)
+def python_sort(a):
+    a.sort()
 
-def run_one_test_case(a, b):
-    c1 = a + b
-    c2 = add(a, b)
-    if c1 == c2:
+if __name__ == "__main__":
+    def selection_sort(a):
+        python_sort(a)
+else:
+    def selection_sort(a):
+        return answer.selection_sort(a)
+
+def run_one_test_case(a):
+    b = a[:]
+    c = a[:]
+    python_sort(b)
+    selection_sort(c)
+    if b == c:
         return True, ""
     else:
-        err = "{0} + {1}, should be {2}, but got {3}".format(\
-              a, b, c1, c2)
+        err = "Sort {0}, should be {1}, but got {2}".format(\
+              a, b, c)
         return False, err
 
 def generate_test_data():
     test_data_list = []
-    for i in xrange(100):
-        a = util.randint()
-        b = util.randint()
-        test_data_list.append((a, b))
+    for i in xrange(10000):
+        a = util.randint_array()
+        test_data_list.append(a)
     return test_data_list
 
 def run_test():

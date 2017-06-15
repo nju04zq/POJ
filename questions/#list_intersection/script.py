@@ -66,16 +66,10 @@ def generate_test_data():
     return test_data
 
 def run_test():
-    test_data = generate_test_data()
-    test_data_size = len(test_data)
-    passed = 0
-    for i, data_entry in enumerate(test_data):
-        rc, err = run_one_test_case(*data_entry)
-        if rc == False:
-            return False, passed, test_data_size, err
-        else:
-            passed += 1
-    return True, passed, passed, ""
+    test_data_list = generate_test_data()
+    result = util.run_test_in_parallel(run_one_test_case, test_data_list)
+    rc, passed, total, fail_case = result
+    return rc, passed, total, fail_case
 
 if __name__ == "__main__":
     rc, passed, total, fail_case = run_test()

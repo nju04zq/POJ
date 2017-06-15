@@ -21,30 +21,38 @@ else:
     def binary_search(target, array):
         return answer.binary_search(target, array)
 
-def run_one_test_case():
-    a = util.randint_list()
-    t = util.randint()
+def run_one_test_case(t, a):
     i = binary_search(t, a)
     j = brutal_search(t, a)
     if i == -1 and j != -1:
-        test_case = "Find {0} in {1}, get {2}, could be {3}".format(\
-                    t, a, i, j)
-        return False, test_case
+        err = "Find {0} in {1}, get {2}, should be {3}".format(\
+              t, a, i, j)
+        return False, err
     elif i == -1 and j == -1:
         return True, ""
     elif i < 0 or i >= len(a):
-        test_case = "Find {0} in {1}, get {2}, exceed limit".format(\
-                    t, a, i)
-        return False, test_case
+        err = "Find {0} in {1}, get {2}, exceed limit".format(\
+              t, a, i)
+        return False, err
     elif i != -1 and a[i] != t:
-        test_case = "Find {0} in {1}, get {2}, but a[i] != t".format(\
-                    t, a, i)
-        return False, test_case
+        err = "Find {0} in {1}, get {2}, but a[i] != t".format(\
+              t, a, i)
+        return False, err
     else:
         return True, ""
 
+def generate_test_data_list():
+    test_data_list = []
+    for i in xrange(10000):
+        t = util.randint()
+        a = util.randint_sorted_array()
+        test_data_list.append((t, a))
+    return test_data_list
+
 def run_test():
-    rc, passed, total, err = util.run_test_in_parallel(run_one_test_case, 10000)
+    test_data_list = generate_test_data_list()
+    result = util.run_test_in_parallel(run_one_test_case, test_data_list)
+    rc, passed, total, err = result
     return rc, passed, total, err
 
 if __name__ == "__main__":

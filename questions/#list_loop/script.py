@@ -57,7 +57,7 @@ else:
 
 def generate_test_data():
     test_data = []
-    for i in xrange(1, 6):
+    for i in xrange(1, 11):
         a = util.generate_list(size=i)
         test_data.append(util.copy_list(a))
         p = a
@@ -85,16 +85,10 @@ def run_one_test_case(a):
     return True, ""
 
 def run_test():
-    test_data = generate_test_data()
-    test_case_size = len(test_data)
-    for i, data_entry in enumerate(test_data):
-        rc, case_str = run_one_test_case(data_entry)
-        if rc == True:
-            continue
-        else:
-            return False, i+1, test_case_size, case_str
-    else:
-        return True, test_case_size, test_case_size, ""
+    test_data_list = generate_test_data()
+    result = util.run_test_in_parallel(run_one_test_case, test_data_list)
+    rc, passed, total, fail_case = result
+    return rc, passed, total, fail_case
 
 if __name__ == "__main__":
     rc, passed, total, fail_case = run_test()

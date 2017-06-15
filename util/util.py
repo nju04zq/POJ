@@ -9,13 +9,6 @@ random.seed()
 _RANDINT_MIN_ = 0
 _RANDINT_MAX_ = 100
 
-class POJError(Exception):
-    def __init__(self, value):
-        self.value = value
-
-    def __str__(self):
-        return format_err_msg(self.value)
-
 def randint(min_int=None, max_int=None):
     if min_int is None:
         min_int = _RANDINT_MIN_
@@ -23,7 +16,7 @@ def randint(min_int=None, max_int=None):
         max_int = _RANDINT_MAX_
     return random.randint(min_int, max_int)
 
-def randint_list(min_int=None, max_int=None, size=None):
+def randint_array(min_int=None, max_int=None, size=None):
     if min_int is None:
         min_int = _RANDINT_MIN_
     if max_int is None:
@@ -31,7 +24,11 @@ def randint_list(min_int=None, max_int=None, size=None):
     if size is None:
         size = randint(min_int=0, max_int=63)
     array = [randint(min_int, max_int) for i in xrange(size)]
-    array.sort()
+    return array
+
+def randint_sorted_array(min_int=None, max_int=None, size=None, reverse=False):
+    array = randint_array(min_int, max_int, size)
+    array.sort(reverse=reverse)
     return array
 
 class ListNode(object):
@@ -162,16 +159,20 @@ def copy_list_pair(a, b):
         p = p.next
     return a1, b1
 
-def runtest_api(lock, env, passed, left):
+def runtest_api(test_data_list, lock, env, passed, left):
     while True:
         lock.acquire()
         if left.value == 0 or "err" in env:
             lock.release()
             break
         left.value -= 1
+        data = test_data_list.pop()
         lock.release()
         try:
-            rc, err = env["api"]()
+            if isinstance(data, tuple):
+                rc, err = env["api"](*data)
+            else:
+                rc, err = env["api"](data)
         except:
             env["exception"] = True
             env["err"] = traceback.format_exc()
@@ -184,12 +185,12 @@ def runtest_api(lock, env, passed, left):
             env["err"] = err
             break
 
-def create_runtest_plist(lock, env, passed, left):
+def create_runtest_plist(test_data_list, lock, env, passed, left):
     plist = []
     RUN_PARALLEL_PROC_CNT = 2
     for i in xrange(RUN_PARALLEL_PROC_CNT):
         p = multiprocessing.Process(target=runtest_api,
-                                    args=(lock, env, passed, left))
+                                    args=(test_data_list,lock,env,passed,left))
         plist.append(p)
     return plist
 
@@ -206,14 +207,16 @@ def clear_last_msg(last_msg):
     sys.stdout.write("\r" + " "*msg_len + "\r")
     sys.stdout.flush()
 
-def run_test_in_parallel(run_single_test_api, test_case_size):
+def run_test_in_parallel(run_single_test_api, test_data_list):
+    test_case_size = len(test_data_list)
     manager = multiprocessing.Manager()
     env = manager.dict()
     env["api"] = run_single_test_api
+    test_data_list = manager.list(test_data_list)
     passed = multiprocessing.Value("i", 0)
     left = multiprocessing.Value("i", test_case_size)
     lock = multiprocessing.Lock()
-    plist = create_runtest_plist(lock, env, passed, left)
+    plist = create_runtest_plist(test_data_list, lock, env, passed, left)
     start_runtest_plist(plist)
     while True:
         last_msg = "\rRunning test, {0}/{1}".format(\

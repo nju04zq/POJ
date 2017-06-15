@@ -22,20 +22,28 @@ else:
     def binary_search_first_occur(target, array):
         return answer.binary_search_first_occur(target, array)
 
-def run_one_test_case():
-    a = util.randint_list()
-    t = util.randint()
+def run_one_test_case(t, a):
     i = binary_search_first_occur(t, a)
     j = brutal_search(t, a)
     if i != j:
-        test_case = "Find first occur {0} in {1}, get {2}, should {3}".format(\
-                    t, a, i, j)
-        return False, test_case
+        err = "Find first occur {0} in {1}, get {2}, should be {3}".format(\
+              t, a, i, j)
+        return False, err
     else:
         return True, ""
 
+def generate_test_data_list():
+    test_data_list = []
+    for i in xrange(10000):
+        t = util.randint()
+        a = util.randint_sorted_array()
+        test_data_list.append((t, a))
+    return test_data_list
+
 def run_test():
-    rc, passed, total, err = util.run_test_in_parallel(run_one_test_case, 10000)
+    test_data_list = generate_test_data_list()
+    result = util.run_test_in_parallel(run_one_test_case, test_data_list)
+    rc, passed, total, err = result
     return rc, passed, total, err
 
 if __name__ == "__main__":

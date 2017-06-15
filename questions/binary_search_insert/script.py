@@ -22,9 +22,7 @@ else:
     def binary_insert(target, array):
         return answer.binary_insert(target, array)
 
-def run_one_test_case():
-    target = util.randint()
-    array = util.randint_list()
+def run_one_test_case(target, array):
     r1 = brutal_insert(target, array)
     r2 = binary_insert(target, array)
     if r1 == r2:
@@ -34,8 +32,19 @@ def run_one_test_case():
               target, array, r1, r2)
         return False, err
 
+def generate_test_data():
+    test_data_list = []
+    for i in xrange(10000):
+        target = util.randint()
+        array = util.randint_sorted_array()
+        test_data_list.append((target, array))
+    return test_data_list
+
 def run_test():
-    return util.run_test_in_parallel(run_one_test_case, 10000)
+    test_data_list = generate_test_data()
+    result = util.run_test_in_parallel(run_one_test_case, test_data_list)
+    rc, passed, total, fail_case = result
+    return rc, passed, total, fail_case
 
 if __name__ == "__main__":
     rc, passed, total, fail_case = run_test()

@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import os
+import sys
 import time
 import yaml
 import shutil
@@ -9,7 +10,6 @@ import hashlib
 import datetime
 import optparse
 import traceback
-from util.util import POJError
 
 _QUESTION_DIR_ = "questions"
 _QUESTION_SCRIPT_ = "script.py"
@@ -19,6 +19,10 @@ _LOG_DIR_ = "log"
 _QUESTION_LOG_FILE_ = "submit.log"
 _SESSION_CONF_ = "session.yaml"
 _STATS_FILE_ = "stats.yaml"
+_SANITY_RESULT_FNAME_ = _LOG_DIR_ + os.sep + "poj_sanity.result"
+
+_PASS_RESULT_ = "PASS"
+_FAIL_RESULT_ = "FAIL"
 
 _DEBUG_MODE_ = False
 
@@ -131,6 +135,7 @@ class Session(object):
         with open(dst_path, "w") as fp:
             answer_module = os.path.splitext(_ANSWER_SCRIPT_)[0]
             fp.write("import {0}\n".format(answer_module))
+            fp.write("reload({0})\n".format(answer_module))
             fp.write("import sys\n")
             fp.write('sys.path.append("..")\n')
             with open(script_path, "r") as fp1:
@@ -138,9 +143,10 @@ class Session(object):
             fp.writelines(lines)
 
     def build_answer(self):
-        from build.script import run_test
+        import build.script
+        reload(build.script)
         try:
-            result = run_test()
+            result = build.script.run_test()
         except:
             s = traceback.format_exc()
             raise POJError("Run failed, {0}".format(s))
@@ -161,9 +167,9 @@ class Session(object):
         question_log_fpath = question_log_dir + os.sep + _QUESTION_LOG_FILE_
         ts = self.submit_ts.strftime("%Y-%m-%d %H:%M:%S:")
         if rc == True:
-            rc = "PASS"
+            rc = _PASS_RESULT_
         else:
-            rc = "FAIL"
+            rc = _FAIL_RESULT_
         answer_fname = self.get_answer_file_save_name()
         with open(question_log_fpath, "a") as fp:
             fp.write("{0} Submit result {1}, {2}/{3}, answer {4}\n".\
@@ -189,9 +195,9 @@ class Session(object):
     def show_submit_result(self, result):
         rc, passed, total, fail_case_str = result
         if rc == True:
-            rc = format_green("PASS")
+            rc = format_green(_PASS_RESULT_)
         else:
-            rc = format_red("FAIL")
+            rc = format_red(_FAIL_RESULT_)
         print "Submit {0}, passed test cases {1}/{2}".format(rc, passed, total)
         if fail_case_str != "":
             print fail_case_str
@@ -273,6 +279,16 @@ class Questions(object):
             name_list.append(entry)
         return name_list
 
+    def get_all_question_names(self):
+        entry_list = os.listdir(_QUESTION_DIR_)
+        name_list = []
+        for entry in entry_list:
+            entry_path = _QUESTION_DIR_ + os.sep + entry
+            if not os.path.isdir(entry_path):
+                continue
+            name_list.append(entry)
+        return name_list
+
     def filter_question_name_list(self):
         name_list = question_stats.get_least_submit_question()
         name_list += self.get_untouched_question()
@@ -330,6 +346,18 @@ class Questions(object):
         print "Question: " + question_name
         print self.read_question_desc(question_name)
 
+    def get_answer_fnames(self, question_name):
+        fnames = []
+        path = self.get_question_path(question_name)
+        prefix = os.path.splitext(_ANSWER_SCRIPT_)[0]
+        suffix = os.path.splitext(_ANSWER_SCRIPT_)[1]
+        for name in os.listdir(path):
+            if not os.path.isfile(path+os.sep+name):
+                continue
+            if name.startswith(prefix) and name.endswith(suffix):
+                fnames.append(name)
+        return fnames
+
 def poj_new(question_name):
     session = Session(question_name=question_name)
     session.start()
@@ -350,6 +378,111 @@ def poj_clean(question_name):
         raise POJError("Please run with question name!")
     question_stats.clean(question_name)
     clean_log_dir(question_name)
+
+def poj_sanity(question_name):
+    renamed_path = rename_log_dir()
+    if question_name is None:
+        question_name_list = questions.get_all_question_names()
+    else:
+        questions.validate_question(question_name)
+        question_name_list = [question_name]
+    try:
+        sanity_on_question_list(question_name_list)
+    except:
+        raise
+    finally:
+        move_back_log_dir(renamed_path)
+
+def rename_log_dir():
+    if not os.path.exists(_LOG_DIR_):
+        os.mkdir(_LOG_DIR_)
+        return None
+    renamed_dir = _LOG_DIR_ + str(int(time.time()))
+    os.rename(_LOG_DIR_, renamed_dir)
+    os.mkdir(_LOG_DIR_)
+    return renamed_dir
+
+def move_back_log_dir(renamed_path):
+    if os.path.exists(_LOG_DIR_):
+        shutil.rmtree(_LOG_DIR_)
+    if renamed_path is None:
+        return
+    os.rename(renamed_path, _LOG_DIR_)
+
+def format_passed_answer(passed_answers):
+    if len(passed_answers) == 0:
+        return ""
+    s = []
+    for passed_answer in passed_answers:
+        s.append(format_green(passed_answer))
+    return " ".join(s)
+
+def sanity_on_question_list(question_name_list):
+    for question_name in question_name_list:
+        sys.stdout.write("???? {0}".format(question_name))
+        sys.stdout.flush()
+        passed_answers = []
+        for answer_fname in questions.get_answer_fnames(question_name):
+            fp_stdout = redirect_stdout()
+            try:
+                sanity_on_one_question(question_name, answer_fname)
+            except:
+                print
+                raise
+            finally:
+                recover_stdout(fp_stdout)
+            err = check_sanity_result(question_name)
+            if err == "":
+                sys.stdout.write(" " + format_green(answer_fname))
+                sys.stdout.flush()
+                passed_answers.append(answer_fname)
+            else:
+                passed_answer_str = format_passed_answer(passed_answers)
+                fail_str = format_red("FAIL")
+                fail_answer = format_red(answer_fname)
+                sys.stdout.write("\r{0} {1} {2} {3}\n{4}\n".format(\
+                                 fail_str, question_name, passed_answer_str,\
+                                 fail_answer, err))
+                return
+        else:
+            pass_str = format_green("PASS")
+            passed_answer_str = format_passed_answer(passed_answers)
+            sys.stdout.write("\r{0} {1} {2}\n".format(\
+                             pass_str, question_name, passed_answer_str))
+
+def check_sanity_result(question_name):
+    with open(_SANITY_RESULT_FNAME_, "r") as fp:
+        result = "".join(fp.readlines())
+    result = result.replace("\r", "\n").rstrip()
+    lines = result.split("\n")
+    if _PASS_RESULT_ in lines[-1]:
+        return ""
+    else:
+        return lines[-2] + "\n" + lines[-1]
+
+def copy_question_answer(question_name, answer_fname):
+    path = questions.get_question_path(question_name)
+    src_path = path + os.sep + answer_fname
+    dst_path = _BUILD_DIR_ + os.sep + _ANSWER_SCRIPT_
+    shutil.copyfile(src_path, dst_path)
+
+def redirect_stdout():
+    if not os.path.exists(_BUILD_DIR_):
+        os.mkdir(_BUILD_DIR_)
+    fp = open(_SANITY_RESULT_FNAME_, "w")
+    fp_stdout = sys.stdout
+    sys.stdout = fp
+    return fp_stdout
+
+def recover_stdout(fp_stdout):
+    fp = sys.stdout
+    sys.stdout = fp_stdout
+    fp.close()
+
+def sanity_on_one_question(question_name, answer_fname):
+    poj_new(question_name)
+    copy_question_answer(question_name, answer_fname)
+    poj_submit()
 
 def init_question():
     global questions
@@ -379,6 +512,8 @@ def main():
         poj_submit()
     elif args[0] == "clean":
         poj_clean(options.name)
+    elif args[0] == "sanity":
+        poj_sanity(options.name)
     else:
         print "Unsupported arg {0}".format(args[0])
 
