@@ -175,7 +175,9 @@ def runtest_api(test_data_list, lock, env, passed, left):
                 rc, err = env["api"](data)
         except:
             env["exception"] = True
-            env["err"] = traceback.format_exc()
+            err = "\n" + "*"*50 + "\n"
+            err += "Fail on {0}\n".format(data) + traceback.format_exc()
+            env["err"] = err
             break
 
         if rc == True:

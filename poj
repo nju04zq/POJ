@@ -56,13 +56,13 @@ class Session(object):
     KEY_SUBMIT_CNT = "submit_cnt"
 
     def __init__(self, question_name=None, from_yaml=False):
-        if question_name is None:
-            question_name = questions.choose_one_question()
-        else:
-            questions.validate_question(question_name)
         if from_yaml:
             self.init_from_yaml()
         else:
+            if question_name is None:
+                question_name = questions.choose_one_question()
+            else:
+                questions.validate_question(question_name)
             self.question_name = question_name
             self.session_id = self.create_session_id()
             self.submit_cnt = 0

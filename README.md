@@ -2,13 +2,13 @@
 
 ## Usage
 
-### Solve a random picked problem
+### Solve a random picked question
 - ./poj new
 - vim answer.py
 - ./poj submit
 
-### Solve a specific problem
-- ./poj new -n <problem_name>
+### Solve a specific question
+- ./poj new -n <question\_name>
 - vim answer.py
 - ./poj submit
 
@@ -17,14 +17,14 @@
 - cat log/stats.yaml
 
 ### Clean submit log
-- ./poj clean
+- ./poj clean -n <question\_name>
 
-### Add a quesiont
+### Add a question
 - cd questions
-- mkdir <question_name>
+- mkdir <question\_name>
 - follow sample question test, script.py for UT, answer.py as a sample answer
-- question_name starts with #, means it won't be chosen with "./poj new"
+- question\_name starts with #, means it won't be chosen with "./poj new"
 
-### Check the sample answer under question dir
+### Verify the sample answer under question dir
 - ./poj sanity
-- ./poj sanity -n <question_name>
+- ./poj sanity -n <question\_name>

@@ -11,4 +11,3 @@ def binary_search_last_occur(target, array):
         else:
             low = mid + 1
     return last_occur
-

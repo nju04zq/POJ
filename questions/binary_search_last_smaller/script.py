@@ -1,34 +1,32 @@
-# Find the target integer last occuring in an array,
-# which is sorted in non-descending order
+# Find in an array sorted in non-descending order,
+# for the last element smaller than target.
 # Return its index, if not exist, return -1
 # Define the API interface as:
-# def binary_search_last_occur(target, array):
+# def binary_search_last_smaller(target, array):
 
 import sys
 sys.path.append("../../")
 import util.util as util
 
 def brutal_search(target, array):
-    i = len(array) - 1
-    while i >= 0:
-        if array[i] == target:
-            return i
-        i -= 1
+    for i, num in enumerate(array):
+        if num >= target:
+            return i-1
     else:
-        return -1
+        return len(array) - 1
 
 if __name__ == "__main__":
-    def binary_search_last_occur(target, array):
+    def binary_search_last_smaller(target, array):
         return brutal_search(target, array)
 else:
-    def binary_search_last_occur(target, array):
-        return answer.binary_search_last_occur(target, array)
+    def binary_search_last_smaller(target, array):
+        return answer.binary_search_last_smaller(target, array)
 
 def run_one_test_case(t, a):
-    i = binary_search_last_occur(t, a)
+    i = binary_search_last_smaller(t, a)
     j = brutal_search(t, a)
     if i != j:
-        err = "Find last occur {0} in {1}, get {2}, should {3}".format(\
+        err = "Find last smaller {0} in {1}, get {2}, should be {3}".format(\
               t, a, i, j)
         return False, err
     else:
