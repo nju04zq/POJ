@@ -5,7 +5,8 @@
 
 import sys
 sys.path.append("../../")
-import util.util as util
+import util.randutil as randutil
+import util.testutil as testutil
 
 def python_sort(a):
     a.sort()
@@ -32,13 +33,13 @@ def run_one_test_case(a):
 def generate_test_data():
     test_data_list = []
     for i in xrange(10000):
-        a = util.randint_array()
+        a = randutil.randint_array()
         test_data_list.append(a)
     return test_data_list
 
 def run_test():
     test_data_list = generate_test_data()
-    result = util.run_test_in_parallel(run_one_test_case, test_data_list)
+    result = testutil.run_test_in_parallel(run_one_test_case, test_data_list)
     rc, passed, total, fail_case = result
     return rc, passed, total, fail_case
 

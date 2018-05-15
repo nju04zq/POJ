@@ -5,7 +5,8 @@
 
 import sys
 sys.path.append("../../")
-import util.util as util
+import util.randutil as randutil
+import util.testutil as testutil
 
 def brutal_search(target, array):
     for i, num in enumerate(array):
@@ -44,14 +45,14 @@ def run_one_test_case(t, a):
 def generate_test_data_list():
     test_data_list = []
     for i in xrange(10000):
-        t = util.randint()
-        a = util.randint_sorted_array()
+        t = randutil.randint()
+        a = randutil.randint_sorted_array()
         test_data_list.append((t, a))
     return test_data_list
 
 def run_test():
     test_data_list = generate_test_data_list()
-    result = util.run_test_in_parallel(run_one_test_case, test_data_list)
+    result = testutil.run_test_in_parallel(run_one_test_case, test_data_list)
     rc, passed, total, err = result
     return rc, passed, total, err
 

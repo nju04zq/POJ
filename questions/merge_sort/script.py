@@ -1,7 +1,7 @@
 # Give an array filled with integers, sort it in non-decending order,
-# using insertion sort
+# using merge sort, try recursive & non-recursive
 # Define the API interface as:
-# def insertion_sort(a):
+# def merge_sort(a):
 
 import sys
 sys.path.append("../../")
@@ -12,17 +12,17 @@ def python_sort(a):
     a.sort()
 
 if __name__ == "__main__":
-    def insertion_sort(a):
+    def merge_sort(a):
         python_sort(a)
 else:
-    def insertion_sort(a):
-        return answer.insertion_sort(a)
+    def merge_sort(a):
+        return answer.merge_sort(a)
 
 def run_one_test_case(a):
     b = a[:]
     c = a[:]
     python_sort(b)
-    insertion_sort(c)
+    merge_sort(c)
     if b == c:
         return True, ""
     else:

@@ -389,6 +389,7 @@ def poj_sanity(question_name):
     try:
         sanity_on_question_list(question_name_list)
     except:
+        print
         raise
     finally:
         move_back_log_dir(renamed_path)
@@ -457,8 +458,12 @@ def check_sanity_result(question_name):
     lines = result.split("\n")
     if _PASS_RESULT_ in lines[-1]:
         return ""
+    for i, line in enumerate(lines):
+        if line.startswith("Submit") and "passed test cases" in line:
+            break
     else:
         return lines[-2] + "\n" + lines[-1]
+    return "\n".join(lines[i+1:])
 
 def copy_question_answer(question_name, answer_fname):
     path = questions.get_question_path(question_name)
